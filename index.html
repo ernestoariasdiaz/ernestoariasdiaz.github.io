@@ -1,0 +1,856 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ernesto Arias Díaz · ariasOS</title>
+<meta name="description" content="Ernesto Arias Díaz: infraestructura Linux, SRE y Rust. 15+ años en sistemas críticos del sector financiero y de pagos. Proyectos, investigación y notas de ingeniería.">
+<meta property="og:title" content="Ernesto Arias Díaz · ariasOS">
+<meta property="og:description" content="Infraestructura Linux, SRE y Rust. Proyectos, investigación y notas de ingeniería.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://ernestoarias.dev/">
+<meta property="og:image" content="https://ernestoarias.dev/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="627">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://ernestoarias.dev/og-image.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3E%3Crect x='1' y='1' width='28' height='28' rx='5' fill='%23b4440e'/%3E%3Cpath d='M8 21 L15 8 L22 21 M11 16.5 H19' stroke='white' stroke-width='2.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a live-boot of a Linux distro. Boot log -> desktop (wallpaper + icon column + top panel) -> each icon opens a window with one section of the portfolio. Phones get full-screen windows. */
+:root{
+  --bg:#eef0f3; --surface:#ffffff; --surface-2:#f5f6f8; --ink:#141a22; --muted:#566170; --line:#d4d9e0;
+  --accent:#b4440e; --accent-ink:#ffffff; --accent-soft:#f6e3d8; --ok:#2f7d4f;
+  --wall:#10151c; --wall-2:#18202a; --wall-ink:#e6eaf0; --wall-dim:#8b96a5; --wall-acc:#f0783a;
+  --term-bg:#0d1117; --term-fg:#d7dde5; --term-dim:#7f8a98; --term-ok:#6fd39b; --term-bad:#ff6b6b; --term-acc:#f08a4b;
+  --f-display:"Chakra Petch","IBM Plex Mono",ui-monospace,monospace;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --panel-h:38px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0f1318; --surface:#161c23; --surface-2:#1b222b; --ink:#e6eaf0; --muted:#97a3b1; --line:#2a333e;
+  --accent:#f0783a; --accent-ink:#1a0c04; --accent-soft:#3a2216; --ok:#5cc28a; color-scheme:dark; } }
+:root[data-theme="dark"]{
+  --bg:#0f1318; --surface:#161c23; --surface-2:#1b222b; --ink:#e6eaf0; --muted:#97a3b1; --line:#2a333e;
+  --accent:#f0783a; --accent-ink:#1a0c04; --accent-soft:#3a2216; --ok:#5cc28a; color-scheme:dark; }
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--wall);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.6;overflow:hidden}
+a{color:var(--accent)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--wall-acc);outline-offset:2px}
+
+/* ---------- boot ---------- */
+#boot{position:fixed;inset:0;z-index:100;background:#000;color:#c9d1d9;font-family:var(--f-mono);font-size:clamp(11px,1.6vw,14px);line-height:1.5;padding:max(18px,env(safe-area-inset-top)) 20px 20px;overflow:hidden;cursor:pointer}
+#boot .bootlog{white-space:pre-wrap;overflow-wrap:anywhere}
+#boot .ok{color:#3fb950} #boot .bad{color:#f85149} #boot .dim{color:#6e7681} #boot .hl{color:#f0883e}
+#boot .skip{position:absolute;right:16px;bottom:max(14px,env(safe-area-inset-bottom));color:#6e7681;font-size:12px}
+.grub{max-width:720px;margin:6vh auto 0;border:1px solid #8b949e;padding:14px 0 12px}
+.grub h2{font:inherit;text-align:center;margin:0 0 12px;color:#e6edf3}
+.grub ul{list-style:none;margin:0;padding:0}
+.grub li{padding:1px 18px}
+.grub li.sel{background:#c9d1d9;color:#000}
+.grub p{margin:14px 18px 0;color:#8b949e}
+.fadeout{transition:opacity .5s ease;opacity:0}
+
+/* ---------- desktop ---------- */
+#desktop{position:fixed;inset:0;background:
+  radial-gradient(1200px 700px at 85% 110%, rgba(240,120,58,.18), transparent 60%),
+  linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px) 0 0/44px 44px,
+  linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px) 0 0/44px 44px,
+  linear-gradient(160deg,var(--wall-2),var(--wall));
+  color:var(--wall-ink)}
+.panel{position:absolute;left:0;right:0;top:0;height:calc(var(--panel-h) + env(safe-area-inset-top,0px));padding-top:env(safe-area-inset-top,0px);background:rgba(8,11,15,.82);backdrop-filter:blur(8px);display:flex;align-items:center;gap:10px;padding-inline:10px;z-index:50;font-family:var(--f-mono);font-size:13px;border-bottom:1px solid rgba(255,255,255,.06)}
+.brand{display:flex;align-items:center;gap:8px;font-family:var(--f-display);font-weight:700;font-size:15px;background:none;border:0;cursor:pointer;padding:4px 6px;border-radius:4px;color:var(--wall-ink)}
+.brand:hover{background:rgba(255,255,255,.07)}
+.tasks{flex:1;display:flex;gap:4px;overflow-x:auto;min-width:0;scrollbar-width:none}
+.task{background:rgba(255,255,255,.05);border:1px solid transparent;border-radius:4px;padding:3px 10px;white-space:nowrap;cursor:pointer;color:var(--wall-dim);font-family:var(--f-mono);font-size:12.5px}
+.task.active{color:var(--wall-ink);border-color:rgba(240,120,58,.6);background:rgba(240,120,58,.14)}
+.clock{color:var(--wall-ink);white-space:nowrap;font-variant-numeric:tabular-nums}
+.icons{position:absolute;top:calc(var(--panel-h) + env(safe-area-inset-top,0px) + 18px);left:14px;bottom:14px;display:grid;grid-auto-flow:column;grid-template-rows:repeat(auto-fill,104px);grid-auto-columns:96px;gap:6px 8px;align-content:start;z-index:1}
+.icon{display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 4px;border-radius:6px;background:none;border:1px solid transparent;cursor:pointer;color:var(--wall-ink);text-align:center}
+.icon:hover{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.08)}
+.icon svg{width:48px;height:48px;filter:drop-shadow(0 4px 8px rgba(0,0,0,.4))}
+.icon span{font-family:var(--f-mono);font-size:12px;line-height:1.3;text-shadow:0 1px 3px rgba(0,0,0,.8)}
+.wallmark{position:absolute;right:28px;bottom:22px;text-align:right;pointer-events:none;color:var(--wall-dim);font-family:var(--f-mono);font-size:12px}
+.wallmark b{display:block;font-family:var(--f-display);font-size:clamp(40px,7vw,92px);line-height:1;color:rgba(230,234,240,.08);letter-spacing:-.02em}
+
+/* ---------- windows ---------- */
+.win{position:absolute;display:flex;flex-direction:column;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:8px;box-shadow:0 24px 60px -20px rgba(0,0,0,.65),0 2px 6px rgba(0,0,0,.25);overflow:hidden;min-width:280px;min-height:180px;animation:pop .16s ease-out}
+@keyframes pop{from{transform:scale(.97);opacity:.4}}
+.win[data-min="1"]{display:none}
+.win.max{left:0!important;top:calc(var(--panel-h) + env(safe-area-inset-top,0px))!important;width:100%!important;height:calc(100% - var(--panel-h) - env(safe-area-inset-top,0px))!important;border-radius:0}
+.titlebar{display:flex;align-items:center;gap:8px;height:36px;padding:0 6px 0 12px;background:var(--surface-2);border-bottom:1px solid var(--line);font-family:var(--f-mono);font-size:12.5px;color:var(--muted);cursor:grab;user-select:none;touch-action:none;flex:none}
+.win.focused .titlebar{color:var(--ink)}
+.titlebar .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wbtn{width:28px;height:24px;border:0;border-radius:4px;background:none;cursor:pointer;color:var(--muted);display:grid;place-items:center;font-family:var(--f-mono);font-size:14px;line-height:1}
+.wbtn:hover{background:var(--line);color:var(--ink)}
+.wbtn.close:hover{background:#d1453b;color:#fff}
+.wbody{flex:1;overflow:auto;padding:22px 24px 28px;min-height:0}
+.resize{position:absolute;right:0;bottom:0;width:16px;height:16px;cursor:nwse-resize;touch-action:none}
+
+/* ---------- content inside windows ---------- */
+h1,h2,h3{font-family:var(--f-display);line-height:1.15;text-wrap:balance;margin:0}
+.eyebrow{font-family:var(--f-mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.wbody p{max-width:68ch}
+.hero-h{font-size:clamp(30px,4vw,44px);margin:6px 0 4px}
+.hero-h span{color:var(--accent)}
+.lede{font-size:17px;color:var(--muted);margin:12px 0 18px}
+.row{display:flex;flex-wrap:wrap;gap:10px}
+.btn{font-family:var(--f-mono);font-size:13px;font-weight:500;text-decoration:none;padding:9px 14px;border-radius:4px;border:1px solid var(--accent);display:inline-flex;align-items:center;gap:8px;cursor:pointer;background:none;color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.spec{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;border-top:1px solid var(--line);margin-top:22px;padding-top:16px}
+.spec dt{font-family:var(--f-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.spec dd{white-space:nowrap;margin:2px 0 0;font-family:var(--f-display);font-size:18px}
+.spec{margin-bottom:0}
+
+.files{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+.files li{border-bottom:1px solid var(--line)}
+.file{display:grid;grid-template-columns:28px 1fr auto;gap:2px 12px;align-items:start;width:100%;text-align:left;background:none;border:0;padding:14px 4px;cursor:pointer}
+.file:hover h3{color:var(--accent)}
+.file svg{margin-top:2px}
+.file h3{font-family:var(--f-body);font-weight:600;font-size:16px}
+.file p{grid-column:2/4;margin:2px 0 0;color:var(--muted);font-size:14px}
+.file time{font-family:var(--f-mono);font-size:12px;color:var(--muted);white-space:nowrap}
+.pathbar{font-family:var(--f-mono);font-size:12.5px;color:var(--muted);margin:-6px 0 14px}
+
+.projects{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.proj{border:1px solid var(--line);border-radius:6px;padding:16px;background:var(--surface-2);display:flex;flex-direction:column;gap:8px;min-width:0}
+.proj-top{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+.proj h3{font-size:19px}
+.proj p{margin:0;color:var(--muted);font-size:14px}
+.state{font-family:var(--f-mono);font-size:11px;padding:1px 7px;border-radius:3px;border:1px solid currentColor}
+.state.live{color:var(--ok)} .state.eol{color:var(--muted)} .state.beta{color:var(--accent)}
+.meta{font-family:var(--f-mono);font-size:12px;color:var(--muted);margin-top:auto!important}
+
+.pkgs{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.pkg{border:1px solid var(--line);border-radius:6px;padding:14px 16px;background:var(--surface-2);min-width:0}
+.pkg h3{font-family:var(--f-mono);font-size:13px;font-weight:500;color:var(--accent);margin-bottom:8px}
+.pkg ul{list-style:none;margin:0;padding:0;font-family:var(--f-mono);font-size:13px}
+.pkg li{display:flex;justify-content:space-between;gap:10px;padding-block:3px;border-bottom:1px dashed var(--line)}
+.pkg li:last-child{border-bottom:0}
+.pkg li span:last-child{color:var(--muted);text-align:right}
+.cmd{font-family:var(--f-mono);font-size:12.5px;color:var(--muted);margin:-6px 0 14px}
+
+.log{border-left:2px solid var(--line);margin-left:6px;display:grid;gap:22px;padding-left:24px}
+.entry{position:relative}
+.entry::before{content:"";position:absolute;left:-31px;top:6px;width:12px;height:12px;border-radius:50%;background:var(--surface);border:2px solid var(--accent)}
+.entry .ver{font-family:var(--f-mono);font-size:12.5px;color:var(--accent)}
+.entry h3{font-size:18px;margin:2px 0 4px}
+.entry p,.entry ul{margin:0;color:var(--muted);max-width:65ch;font-size:14.5px}
+.entry ul{padding-left:18px}
+
+.mirrors{display:grid;gap:0;border-top:1px solid var(--line)}
+.mirror{display:grid;grid-template-columns:120px 1fr auto;gap:4px 12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
+.mirror span{font-family:var(--f-mono);font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.mirror a{font-family:var(--f-mono);font-size:14px;overflow-wrap:anywhere}
+.copy{font-size:12px;padding:4px 10px}
+
+article h1{font-size:clamp(26px,3.6vw,36px);margin:8px 0 6px}
+article .by{font-family:var(--f-mono);font-size:12.5px;color:var(--muted);margin-bottom:18px}
+article h2{font-size:21px;margin:26px 0 8px}
+article p,article li{font-size:16px}
+article ul{max-width:66ch}
+article pre{background:var(--term-bg);color:var(--term-fg);padding:14px 16px;border-radius:5px;overflow-x:auto;font-size:12.5px;line-height:1.55}
+article p code,article li code{background:var(--accent-soft);padding:1px 5px;border-radius:3px;font-size:.9em}
+.figs{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:18px 0}
+.fig{border-top:2px solid var(--accent);padding-top:6px}
+.fig b{display:block;font-family:var(--f-display);font-size:28px;font-variant-numeric:tabular-nums}
+.fig span{font-size:13px;color:var(--muted)}
+.tbl{overflow-x:auto;margin:16px 0}
+table{border-collapse:collapse;width:100%;font-size:14.5px;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line)}
+th{font-family:var(--f-mono);font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:500}
+
+/* terminal app */
+.win.term .wbody{background:var(--term-bg);color:var(--term-fg);font-family:var(--f-mono);font-size:13px;line-height:1.55;padding:12px 14px}
+.term-out{white-space:pre-wrap;overflow-wrap:anywhere;margin:0}
+.term-out .p{color:var(--term-acc)} .term-out .ok{color:var(--term-ok)} .term-out .bad{color:var(--term-bad)} .term-out .d{color:var(--term-dim)}
+.term-out a{color:var(--term-acc)}
+.term-line{display:flex;gap:8px}
+.term-line .p{color:var(--term-acc)}
+.term-line input{flex:1;min-width:0;background:none;border:0;outline:0;color:var(--term-fg);font:inherit;caret-color:var(--term-acc)}
+
+#src{display:none}
+
+/* phones: icon grid fills the screen, windows are full-screen */
+@media (max-width:720px){
+  .icons{left:0;right:0;padding-inline:12px;grid-auto-flow:row;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));grid-template-rows:none;grid-auto-rows:104px;grid-auto-columns:auto}
+  .win{left:0!important;top:calc(var(--panel-h) + env(safe-area-inset-top,0px))!important;width:100%!important;height:calc(100% - var(--panel-h) - env(safe-area-inset-top,0px))!important;border-radius:0;border:0}
+  .titlebar{cursor:default}
+  .wbtn.max,.resize{display:none}
+  .wbody{padding:18px 16px 28px}
+  .clock .date{display:none}
+  .mirror{grid-template-columns:1fr}
+  .wallmark{left:16px;right:16px}
+}
+@media (prefers-reduced-motion:reduce){.win{animation:none}.fadeout{transition:none}}
+</style>
+<noscript><style>#src{display:block;padding:20px;background:var(--bg);color:var(--ink);height:100%;overflow:auto}#desktop,#boot{display:none}body{overflow:auto}</style></noscript>
+</head>
+<body>
+
+<div id="boot" hidden aria-hidden="true"><div class="bootlog" id="bootlog"></div><div class="skip">pulsa cualquier tecla para saltar</div></div>
+
+<div id="desktop">
+  <header class="panel">
+    <button class="brand" type="button" data-open="about" aria-label="Abrir bienvenida">
+      <svg width="20" height="20" viewBox="0 0 30 30" aria-hidden="true"><rect x="1" y="1" width="28" height="28" rx="5" fill="#f0783a"/><path d="M8 21 L15 8 L22 21 M11 16.5 H19" stroke="#1a0c04" stroke-width="2.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      ariasOS
+    </button>
+    <nav class="tasks" id="tasks" aria-label="Ventanas abiertas"></nav>
+    <span class="clock" id="clock"></span>
+  </header>
+
+  <nav class="icons" aria-label="Escritorio">
+    <button class="icon" type="button" data-open="about">
+      <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="8" y="4" width="32" height="40" rx="3" fill="#e6eaf0"/><path d="M14 14h20M14 20h20M14 26h14M14 32h18" stroke="#8b96a5" stroke-width="2.4" stroke-linecap="round"/><circle cx="35" cy="36" r="9" fill="#f0783a"/><path d="M35 32v1M35 35.5v5" stroke="#1a0c04" stroke-width="2.4" stroke-linecap="round"/></svg>
+      <span>LEEME.txt</span>
+    </button>
+    <button class="icon" type="button" data-open="notas">
+      <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M4 12a3 3 0 0 1 3-3h12l4 5h18a3 3 0 0 1 3 3v22a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3z" fill="#c2541a"/><path d="M4 18h40v20a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3z" fill="#f0783a"/><path d="M15 27h18M15 33h12" stroke="#1a0c04" stroke-width="2.4" stroke-linecap="round" opacity=".55"/></svg>
+      <span>notas</span>
+    </button>
+    <button class="icon" type="button" data-open="proyectos">
+      <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M4 12a3 3 0 0 1 3-3h12l4 5h18a3 3 0 0 1 3 3v22a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3z" fill="#3b6ea8"/><path d="M4 18h40v20a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3z" fill="#5b8fd0"/><path d="M19 25l-5 5 5 5M29 25l5 5-5 5" stroke="#0b1a2c" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg>
+      <span>proyectos</span>
+    </button>
+    <button class="icon" type="button" data-open="paquetes">
+      <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 4l18 9v22l-18 9-18-9V13z" fill="#c9a24a"/><path d="M6 13l18 9 18-9M24 22v22" stroke="#5a4510" stroke-width="2.2" fill="none" stroke-linejoin="round"/><path d="M15 8.5l18 9" stroke="#5a4510" stroke-width="2.2" opacity=".6"/></svg>
+      <span>paquetes</span>
+    </button>
+    <button class="icon" type="button" data-open="changelog">
+      <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="6" y="6" width="36" height="36" rx="4" fill="#2f7d4f"/><circle cx="16" cy="15" r="3.5" fill="#e6eaf0"/><circle cx="16" cy="33" r="3.5" fill="#e6eaf0"/><circle cx="32" cy="24" r="3.5" fill="#e6eaf0"/><path d="M16 18.5v11M16 22c0 2 4 2 12 2" stroke="#e6eaf0" stroke-width="2.4" fill="none"/></svg>
+      <span>changelog</span>
+    </button>
+    <button class="icon" type="button" data-open="terminal">
+      <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="4" y="8" width="40" height="32" rx="4" fill="#0d1117" stroke="#3a4552" stroke-width="2"/><path d="M12 19l6 5-6 5" stroke="#f0783a" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M22 30h12" stroke="#e6eaf0" stroke-width="3" stroke-linecap="round"/></svg>
+      <span>terminal</span>
+    </button>
+    <button class="icon" type="button" data-open="contacto">
+      <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="4" y="10" width="40" height="28" rx="4" fill="#e6eaf0"/><path d="M6 13l18 14 18-14" stroke="#8b96a5" stroke-width="2.6" fill="none" stroke-linejoin="round"/><circle cx="38" cy="12" r="6" fill="#f0783a"/></svg>
+      <span>contacto</span>
+    </button>
+  </nav>
+
+  <div class="wallmark" aria-hidden="true"><b>ariasOS</b>15.0 LTS · ernestoarias.dev</div>
+  <div id="windows"></div>
+</div>
+
+<!-- Window contents. Kept in the page so search engines and no-JS readers get everything. -->
+<div id="src">
+
+<section data-win="about" data-title="LEEME.txt — bienvenida" data-w="640" data-h="560">
+  <span class="eyebrow">Santo Domingo, República Dominicana</span>
+  <h1 class="hero-h">Ernesto Arias Díaz<br><span>Infraestructura Linux, SRE y Rust</span></h1>
+  <p class="lede">Director de TI. Más de 15 años manteniendo encendidos sistemas críticos del sector financiero y de pagos, y trabajando con hardware desde el año 2000. Investigador independiente en sistemas de conocimiento con LLMs locales. Escribo sobre lo que mido, incluido lo que sale mal.</p>
+  <div class="row">
+    <button class="btn primary" type="button" data-open="notas">Leer las notas</button>
+    <button class="btn" type="button" data-open="proyectos">Ver proyectos</button>
+    <button class="btn" type="button" data-open="changelog">Trayectoria</button>
+    <button class="btn" type="button" data-open="contacto">Contacto</button>
+  </div>
+  <dl class="spec">
+    <div><dt>Cargo</dt><dd>Director de TI</dd></div>
+    <div><dt>Experiencia</dt><dd>15+ años</dd></div>
+    <div><dt>Kernel</dt><dd>Linux / RHEL</dd></div>
+    <div><dt>Lenguaje</dt><dd>Rust</dd></div>
+    <div><dt>Investigación</dt><dd>1,351 vistas</dd></div>
+  </dl>
+  <p class="cmd" style="margin:18px 0 0">Consejo: abre la <a href="#terminal" data-open="terminal">terminal</a> y escribe <code>help</code>.</p>
+</section>
+
+<section data-win="notas" data-title="~/notas — 5 archivos" data-w="660" data-h="560">
+  <p class="pathbar">/home/ernesto/notas</p>
+  <ul class="files">
+    <li><button class="file" type="button" data-open="phantom">
+      <svg width="24" height="28" viewBox="0 0 24 28" aria-hidden="true"><path d="M2 2h13l7 7v17H2z" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.6"/><path d="M15 2v7h7" fill="none" stroke="var(--accent)" stroke-width="1.6"/></svg>
+      <h3>Phantom Nodes: el 52% de mi grafo no existía</h3><time datetime="2026-06">jun 2026</time>
+      <p>Auditando el grafo que mi propio sistema construía de forma autónoma, 1,892 nodos reportados resultaron ser 911 únicos.</p></button></li>
+    <li><button class="file" type="button" data-open="iso8583">
+      <svg width="24" height="28" viewBox="0 0 24 28" aria-hidden="true"><path d="M2 2h13l7 7v17H2z" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.6"/><path d="M15 2v7h7" fill="none" stroke="var(--accent)" stroke-width="1.6"/></svg>
+      <h3>Ingesta ISO 8583 asíncrona en Rust con Tokio</h3><time datetime="2026-07">jul 2026</time>
+      <p>Un servicio que responde ACK al switch de inmediato y clasifica anomalías por campos, no por etiquetas.</p></button></li>
+    <li><button class="file" type="button" data-open="ocr">
+      <svg width="24" height="28" viewBox="0 0 24 28" aria-hidden="true"><path d="M2 2h13l7 7v17H2z" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.6"/><path d="M15 2v7h7" fill="none" stroke="var(--accent)" stroke-width="1.6"/></svg>
+      <h3>259 documentos que nunca entraron: un umbral silencioso</h3><time datetime="2026-07">jul 2026</time>
+      <p>Un filtro de 100 caracteres descartaba sin avisar el 32% del corpus regulatorio. OCR como red de seguridad.</p></button></li>
+    <li><button class="file" type="button" data-open="motor">
+      <svg width="24" height="28" viewBox="0 0 24 28" aria-hidden="true"><path d="M2 2h13l7 7v17H2z" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.6"/><path d="M15 2v7h7" fill="none" stroke="var(--accent)" stroke-width="1.6"/></svg>
+      <h3>De 3.5 a 79 tokens/s en hardware de consumo</h3><time datetime="2026-06">jun 2026</time>
+      <p>Tres migraciones de motor de inferencia en una laptop: CPU, ternario y CUDA. Qué cambió y qué no.</p></button></li>
+    <li><button class="file" type="button" data-open="cierre">
+      <svg width="24" height="28" viewBox="0 0 24 28" aria-hidden="true"><path d="M2 2h13l7 7v17H2z" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.6"/><path d="M15 2v7h7" fill="none" stroke="var(--accent)" stroke-width="1.6"/></svg>
+      <h3>Postmortem: por qué archivo ANIMUS</h3><time datetime="2026-10">oct 2026</time>
+      <p>Ocho meses, un preprint y un benchmark honesto. Lo que sobrevive del proyecto y lo que no.</p></button></li>
+  </ul>
+</section>
+
+<section data-win="proyectos" data-title="~/proyectos" data-w="760" data-h="560">
+  <p class="pathbar">/home/ernesto/proyectos</p>
+  <div class="projects">
+    <div class="proj">
+      <div class="proj-top"><h3>ANIMUS</h3><span class="state eol">archivado · v4.0</span></div>
+      <p>Sistema autónomo de conocimiento en Rust que construye un grafo de memoria episódica con un LLM local (Gemma 4 E2B sobre llama.cpp CUDA). Su aporte principal fue la auditoría de nodos fantasma y una arquitectura de honestidad epistémica.</p>
+      <p class="meta">Preprint: <a href="https://doi.org/10.5281/zenodo.20674981" target="_blank" rel="noopener">10.5281/zenodo.20674981</a> · 1,351 vistas · 479 descargas</p>
+    </div>
+    <div class="proj">
+      <div class="proj-top"><h3>Corpus regulatorio dominicano</h3><span class="state live">publicado</span></div>
+      <p>Dataset abierto de normativa bancaria de la República Dominicana, limpio y listo para RAG y evaluación. 142 documentos bajo licencia CC-BY-4.0.</p>
+      <p class="meta">Hugging Face · <a href="https://huggingface.co/shellhack" target="_blank" rel="noopener">shellhack</a> · dominican-banking-regulations-corpus</p>
+    </div>
+    <div class="proj">
+      <div class="proj-top"><h3>Ingesta ISO 8583</h3><span class="state live">código abierto</span></div>
+      <p>Microservicio en Rust (Tokio, canal MPSC, sqlx/PostgreSQL) que absorbe ráfagas de transacciones simuladas, responde ACK/NACK y registra anomalías con su motivo de detección.</p>
+      <p class="meta">Rust · Tokio · PostgreSQL · simulador en Python</p>
+    </div>
+    <div class="proj">
+      <div class="proj-top"><h3>DGII Assistant Pro</h3><span class="state beta">beta</span></div>
+      <p>Asistente sobre normativa tributaria y laboral dominicana en Telegram y WhatsApp, con PostgreSQL y la API de Claude como motor.</p>
+      <p class="meta">Telegram · WhatsApp · PostgreSQL · Claude API</p>
+    </div>
+  </div>
+</section>
+
+<section data-win="paquetes" data-title="paquetes instalados" data-w="720" data-h="520">
+  <p class="cmd">$ pacman -Q --explicit</p>
+  <div class="pkgs">
+    <div class="pkg"><h3>core/sistemas</h3><ul>
+      <li><span>rhel / linux</span><span>15+ años</span></li>
+      <li><span>windows-server</span><span>estable</span></li>
+      <li><span>vmware</span><span>estable</span></li>
+      <li><span>bash / powershell</span><span>estable</span></li>
+      <li><span>hardware / servidores</span><span>desde 2000</span></li>
+    </ul></div>
+    <div class="pkg"><h3>extra/automatización</h3><ul>
+      <li><span>ansible</span><span>estable</span></li>
+      <li><span>kubernetes</span><span>ckad en curso</span></li>
+      <li><span>openshift</span><span>labs completos</span></li>
+      <li><span>aws</span><span>estable</span></li>
+    </ul></div>
+    <div class="pkg"><h3>extra/middleware</h3><ul>
+      <li><span>ibm-datapower</span><span>estable</span></li>
+      <li><span>citrix-netscaler</span><span>estable</span></li>
+      <li><span>message-brokers</span><span>estable</span></li>
+      <li><span>iso-8583</span><span>4+ años</span></li>
+    </ul></div>
+    <div class="pkg"><h3>community/dev</h3><ul>
+      <li><span>rust (tokio, sqlx)</span><span>activo</span></li>
+      <li><span>python</span><span>estable</span></li>
+      <li><span>postgresql</span><span>estable</span></li>
+      <li><span>splunk</span><span>estable</span></li>
+      <li><span>llama.cpp / cuda</span><span>activo</span></li>
+    </ul></div>
+  </div>
+</section>
+
+<section data-win="changelog" data-title="CHANGELOG.md" data-w="620" data-h="580">
+  <p class="cmd">$ git log --reverse=false trayectoria</p>
+  <div class="log">
+    <div class="entry">
+      <span class="ver">v15.1 · actual</span>
+      <h3>Director de TI</h3>
+      <p>Responsable del funcionamiento completo del departamento de tecnología: planificar, priorizar, supervisar y responder por sus resultados ante la dirección.</p>
+      <ul>
+        <li>Continuidad operativa de sistemas, servidores, dominios y correo, con respaldos y planes ante fallas.</li>
+        <li>Seguridad de la información, control de accesos, certificados e infraestructura.</li>
+        <li>Gestión y desarrollo del equipo de TI.</li>
+        <li>Administración de proveedores: registradores, hosting y licencias.</li>
+        <li>Despliegues ordenados a producción, con ambientes de prueba, respaldos y capacidad de revertir.</li>
+        <li>Inventario y documentación de la infraestructura, y reportes periódicos de avances y riesgos a la dirección.</li>
+      </ul>
+      <p style="margin-top:10px"><b>Logros</b></p>
+      <ul>
+        <li>Implementé respaldos en todas las áreas que no los tenían.</li>
+        <li>Migración de los repositorios (backend en Rust, frontends web y gestor de cobros), la base de datos de producción del ERP y la configuración de servicios hacia la infraestructura de la empresa.</li>
+        <li>Eliminé las fallas recurrentes de un punto de venta reemplazando el equipo por una alternativa de bajo costo.</li>
+        <li>Selección de un proveedor de equipos más confiable y con mejores precios, con criterios claros de compra.</li>
+        <li>Informé a la dirección desde el inicio sobre el estado de la tecnología, los riesgos y la situación de los respaldos.</li>
+        <li>Acompañamiento técnico al equipo de TI, construyendo una relación de confianza y aprendizaje.</li>
+      </ul>
+    </div>
+    <div class="entry">
+      <span class="ver">v15.0 · 2026</span>
+      <h3>Infraestructura de sistemas centrales, banca</h3>
+      <p>Administración de gateways de integración, balanceadores, brokers de mensajería y observabilidad con Splunk en un entorno bancario de alta disponibilidad.</p>
+    </div>
+    <div class="entry">
+      <span class="ver">v14.x · 2026</span>
+      <h3>Investigación independiente: ANIMUS</h3>
+      <p>Diseño, auditoría y publicación de un sistema autónomo de conocimiento en Rust. Preprint en Zenodo, dataset en Hugging Face y artículos técnicos en dev.to.</p>
+    </div>
+    <div class="entry">
+      <span class="ver">v1.0 → v14 · 15+ años</span>
+      <h3>Infraestructura, procesamiento de pagos con tarjeta</h3>
+      <ul>
+        <li>Operación de infraestructura crítica Linux y Windows para la red de pagos.</li>
+        <li>Alrededor de 4 años a cargo de sistemas de pagos ISO 8583.</li>
+      </ul>
+    </div>
+    <div class="entry">
+      <span class="ver">v0.1 · 2000</span>
+      <h3>Hardware y soporte técnico</h3>
+      <ul>
+        <li>Ensamblaje de computadoras clones, diagnóstico y reemplazo de componentes.</li>
+        <li>Instalación y soporte de Windows desde XP, Microsoft Office y antivirus.</li>
+        <li>Instalación y mantenimiento de servidores físicos.</li>
+      </ul>
+    </div>
+    <div class="entry">
+      <span class="ver">build deps</span>
+      <h3>Formación</h3>
+      <ul>
+        <li>Universidad del Caribe (UNICARIBE).</li>
+        <li>Becario del programa Full Stack de INDOTEL / Talento Digital RD.</li>
+        <li>Preparación completa RHCSA, RHCE y OpenShift (laboratorios). CKAD en curso.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section data-win="contacto" data-title="contacto — mirrors" data-w="560" data-h="400">
+  <p class="cmd">$ cat /etc/pacman.d/mirrorlist</p>
+  <div class="mirrors">
+    <div class="mirror"><span>Correo</span><a class="mail" href="mailto:ernesto.arias.d@gmail.com">ernesto.arias.d@gmail.com</a><button class="btn copy" type="button" data-copy="ernesto.arias.d@gmail.com">Copiar</button></div>
+    <div class="mirror"><span>LinkedIn</span><a href="https://www.linkedin.com/in/shellknower" target="_blank" rel="noopener">in/shellknower</a></div>
+    <div class="mirror"><span>GitHub</span><a href="https://github.com/ernestoariasdiaz" target="_blank" rel="noopener">ernestoariasdiaz</a></div>
+    <div class="mirror"><span>Investigación</span><a href="https://doi.org/10.5281/zenodo.20674981" target="_blank" rel="noopener">Zenodo · ANIMUS v4.0</a></div>
+    <div class="mirror"><span>Hugging Face</span><a href="https://huggingface.co/shellhack" target="_blank" rel="noopener">shellhack</a></div>
+  </div>
+</section>
+
+<section data-win="phantom" data-title="phantom-nodes.md — notas" data-w="720" data-h="620">
+<article>
+  <span class="eyebrow">Auditoría · junio 2026</span>
+  <h1>Phantom Nodes: el 52% de mi grafo no existía</h1>
+  <p class="by">Ernesto Arias Díaz · 6 min</p>
+  <p>ANIMUS llevaba meses corriendo en modo autónomo. Cada ciclo leía una fuente, extraía hechos y los guardaba como nodos en un grafo. El contador subía de forma constante y yo lo usaba como prueba de que el sistema aprendía.</p>
+  <p>Un día decidí no creerle al contador y revisar los nodos uno por uno.</p>
+  <div class="figs">
+    <div class="fig"><b>1,892</b><span>nodos que el sistema reportaba</span></div>
+    <div class="fig"><b>911</b><span>nodos únicos tras deduplicar</span></div>
+    <div class="fig"><b>52%</b><span>de inflación no detectada</span></div>
+  </div>
+  <h2>Cómo se infla un grafo solo</h2>
+  <p>Encontré tres mecanismos. El primero, que el ciclo de "gaps" volvía a investigar el mismo concepto con preguntas casi idénticas y guardaba cada respuesta como un nodo nuevo. El segundo, que el modelo generaba reflexiones sobre sus propias reflexiones, y esas también entraban al grafo como si fueran conocimiento. El tercero, que no había ninguna verificación de igualdad antes de insertar.</p>
+  <p>Ninguno de los tres producía un error. El sistema funcionaba y el número crecía. Justamente por eso nadie lo notaba.</p>
+  <h2>Lo que cambié</h2>
+  <ul>
+    <li>Una plantilla de prompt sin canal de razonamiento y con marcadores estructurales obligatorios.</li>
+    <li>Extracción de la respuesta con <code>rfind()</code> sobre el marcador de cierre, para que nada truncado entre al grafo.</li>
+    <li>Un guardián que rechaza respuestas vacías, cortas o con razonamiento filtrado.</li>
+    <li>Scripts de auditoría reproducibles, publicados junto con el preprint.</li>
+  </ul>
+  <h2>La lección para cualquier sistema</h2>
+  <p>Una métrica que el sistema reporta sobre sí mismo no es una medición. En operaciones pasa igual: un dashboard verde dice lo que el agente de monitoreo cree, no lo que el usuario vive. Hay que verificar desde fuera.</p>
+  <p>Metodología y scripts completos en el <a href="https://doi.org/10.5281/zenodo.20674981" target="_blank" rel="noopener">preprint de Zenodo</a>.</p>
+</article>
+</section>
+
+<section data-win="iso8583" data-title="ingesta-iso8583.md — notas" data-w="740" data-h="620">
+<article>
+  <span class="eyebrow">Rust · pagos · julio 2026</span>
+  <h1>Ingesta ISO 8583 asíncrona en Rust con Tokio</h1>
+  <p class="by">Ernesto Arias Díaz · 7 min</p>
+  <p>Un switch de pagos no puede esperar a que una base de datos termine de escribir. Si la respuesta tarda, la línea se queda ocupada y la cola crece. Por eso este servicio separa dos trabajos: recibir y confirmar, y luego persistir.</p>
+  <h2>La arquitectura</h2>
+  <ul>
+    <li>Un <code>TcpListener</code> de Tokio acepta conexiones y crea una tarea por socket.</li>
+    <li>Cada tarea lee la línea, la mete en un canal <code>mpsc</code> con capacidad para 10,000 tareas y responde <code>ISO_8583_ACK</code> de inmediato.</li>
+    <li>Un único worker consume el canal y escribe en PostgreSQL solo lo que es anómalo.</li>
+    <li>Si el canal está cerrado, el cliente recibe <code>ISO_8583_NACK</code> y queda un warning en el log. Nunca silencio.</li>
+  </ul>
+  <h2>Detectar por campos, no por etiquetas</h2>
+  <p>La primera versión solo guardaba registros que ya venían marcados como anómalos por el simulador. En producción nadie te etiqueta el fraude. La versión actual inspecciona los campos:</p>
+<pre><code>fn motivo_ingesta(payload: &amp;str) -&gt; Option&lt;String&gt; {
+    let mut motivos = Vec::new();
+    let mti = extraer_campo_log(payload, "MTI:");
+    let proc_code = extraer_campo_log(payload, "PROC:");
+
+    if payload.contains("UNKNOWN") || payload.contains("ERR_VAL") {
+        motivos.push("campo_destructivo");
+    }
+    match mti.as_deref() {
+        None =&gt; motivos.push("mti_ausente"),
+        Some(m) if !MTIS_VALIDOS.contains(&amp;m) =&gt; motivos.push("mti_invalido"),
+        _ =&gt; {}
+    }
+    if proc_code.as_deref() == Some("990000") {
+        motivos.push("proc_fraude");
+    }
+    (!motivos.is_empty()).then(|| motivos.join(","))
+}</code></pre>
+  <p>El motivo se guarda junto al registro. Así se puede medir después cuántas detecciones coinciden con la verdad del simulador.</p>
+  <h2>Lo que aprendí</h2>
+  <p>Al principio puse un LLM a dar el veredicto final sobre cada registro. Fue un error de diseño. Las reglas ya estaban en la función de arriba: son deterministas, auditables y cuestan microsegundos. Un modelo de lenguaje en ese camino agrega latencia y no-determinismo donde un regulador exige lo contrario. Los LLMs sirven para explicar una anomalía a un analista, no para decidir si existe.</p>
+  <p>Otros detalles: credenciales fuera del código mediante <code>DATABASE_URL</code>, migraciones idempotentes con <code>ADD COLUMN IF NOT EXISTS</code> y columnas <code>TEXT</code> donde antes un <code>VARCHAR(4)</code> rechazaba justo el MTI inválido que se quería capturar.</p>
+</article>
+</section>
+
+<section data-win="ocr" data-title="umbral-silencioso.md — notas" data-w="700" data-h="600">
+<article>
+  <span class="eyebrow">Datos · julio 2026</span>
+  <h1>259 documentos que nunca entraron: un umbral silencioso</h1>
+  <p class="by">Ernesto Arias Díaz · 4 min</p>
+  <p>El corpus tenía 817 PDFs de normativa bancaria dominicana. El pipeline los procesaba todos sin errores. Cuando crucé la lista de archivos contra los nodos del grafo, faltaban 262.</p>
+  <div class="figs">
+    <div class="fig"><b>817</b><span>PDFs en el corpus</span></div>
+    <div class="fig"><b>262</b><span>nunca ingeridos (32%)</span></div>
+    <div class="fig"><b>259</b><span>recuperados con OCR</span></div>
+  </div>
+  <h2>La causa</h2>
+  <p>El procesador descartaba cualquier documento cuyo texto extraído tuviera menos de 100 caracteres. La regla tenía sentido para filtrar archivos vacíos. Pero los PDFs escaneados no tienen capa de texto: la extracción devolvía casi nada y el documento desaparecía sin dejar rastro en ningún log.</p>
+  <h2>El arreglo</h2>
+  <p>Cuando la extracción nativa no supera el umbral, el documento pasa por OCR con pytesseract antes de decidir. De los 262, se recuperaron 259. Los tres restantes eran ilegibles de verdad.</p>
+  <p>Después agregué 738 enlaces entre documentos relacionados, porque el grafo tenía forma de estrella: todo apuntaba a un nodo central y nada conectaba los documentos entre sí.</p>
+  <h2>La regla que me llevo</h2>
+  <p>Todo filtro que descarta datos debe contar lo que descarta y decirlo en voz alta. Un <code>continue</code> sin log es un agujero negro.</p>
+</article>
+</section>
+
+<section data-win="motor" data-title="motores-de-inferencia.md — notas" data-w="700" data-h="600">
+<article>
+  <span class="eyebrow">LLM · GPU · junio 2026</span>
+  <h1>De 3.5 a 79 tokens/s en hardware de consumo</h1>
+  <p class="by">Ernesto Arias Díaz · 5 min</p>
+  <p>ANIMUS siempre corrió en una laptop: primero una i5 sin GPU dedicada, después una Dell Precision con una RTX 3050 de 4 GB. Cambié el motor de inferencia tres veces.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Motor</th><th>Hardware</th><th>Velocidad</th></tr></thead>
+    <tbody>
+      <tr><td>Llama 3.2 3B ajustado (QLoRA, Q4_K_M)</td><td>CPU</td><td>3.5 tok/s</td></tr>
+      <tr><td>BitNet b1.58 2B (i2_s)</td><td>CPU</td><td>19 tok/s</td></tr>
+      <tr><td>Gemma 4 E2B (UD-Q4_K_XL)</td><td>RTX 3050, CUDA</td><td>76.8–79.3 tok/s</td></tr>
+    </tbody>
+  </table></div>
+  <h2>Lo que la velocidad no arregló</h2>
+  <p>Medí la latencia completa de una consulta: mediana de 11.45 segundos. La generación era la parte pequeña. El arranque en frío, unos 7 segundos, dominaba todo. Optimizar tokens por segundo cuando el cuello de botella es otro es un buen recordatorio de por qué hay que medir de punta a punta.</p>
+  <h2>Lo que empeoró</h2>
+  <p>Un modelo más fluido no es un modelo más correcto. Gemma confabulaba con fluidez de experto, algo más peligroso que las alucinaciones torpes de los modelos anteriores, porque convence. Eso obligó a construir la capa de validación estructural antes de dejarle escribir en el grafo.</p>
+  <h2>Notas de operación</h2>
+  <ul>
+    <li><code>llama-server</code> persistente, con chequeo de <code>/health</code> antes de enviar trabajo.</li>
+    <li>Reinicio automático del proceso si el servidor deja de responder.</li>
+    <li>Benchmarks con mediana de 10 iteraciones, no con la mejor corrida.</li>
+  </ul>
+</article>
+</section>
+
+<section data-win="cierre" data-title="postmortem-animus.md — notas" data-w="700" data-h="600">
+<article>
+  <span class="eyebrow">Postmortem · octubre 2026</span>
+  <h1>Postmortem: por qué archivo ANIMUS</h1>
+  <p class="by">Ernesto Arias Díaz · 5 min</p>
+  <p>ANIMUS empezó en febrero de 2026 con una idea: un sistema que aprende solo, ciclo tras ciclo, y construye su propia memoria. Ocho meses después lo archivo. Este es el porqué.</p>
+  <h2>Lo que dijeron los datos</h2>
+  <p>Comparé ANIMUS contra un RAG vectorial simple y contra GraphRAG de Microsoft, con el mismo modelo generador y 36 preguntas verificadas.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Sistema</th><th>Puntaje total</th></tr></thead>
+    <tbody>
+      <tr><td>ANIMUS</td><td>58.3%</td></tr>
+      <tr><td>GraphRAG</td><td>56.9% (0% de alucinación)</td></tr>
+      <tr><td>RAG vectorial</td><td>50.0%</td></tr>
+    </tbody>
+  </table></div>
+  <p>Con 36 preguntas, la diferencia entre ANIMUS y GraphRAG está dentro del ruido. Ninguno dominó. El techo lo ponía un modelo de 2B parámetros, no la arquitectura.</p>
+  <h2>Lo que no funcionó</h2>
+  <ul>
+    <li>El ciclo autónomo se alimentaba de su propio texto. Más ciclos producían más ruido, no más conocimiento. Ese fue el origen de los nodos fantasma.</li>
+    <li>Lo que parecía emergencia era, mirado de cerca, conteo de coocurrencias.</li>
+    <li>Mientras tanto, los asistentes comerciales incorporaron memoria persistente, búsqueda y tareas programadas. Lo que en febrero era raro hoy viene incluido.</li>
+  </ul>
+  <h2>Lo que sobrevive</h2>
+  <ul>
+    <li>El método de auditoría de Phantom Nodes y sus scripts reproducibles.</li>
+    <li>El corpus regulatorio dominicano, publicado como dataset abierto.</li>
+    <li>Un servicio de ingesta en Rust y mucha experiencia operando LLMs locales.</li>
+  </ul>
+  <p>Cerrar un proyecto con datos es parte del trabajo. Lo más valioso que construí no fue el sistema, fue el hábito de auditarlo.</p>
+</article>
+</section>
+
+</div>
+
+<script>
+(function(){
+  var $ = function(s, r){ return (r||document).querySelector(s); };
+  var winsEl = $('#windows'), tasksEl = $('#tasks');
+  var wins = {}, z = 10, cascade = 0;
+  var mobile = function(){ return window.matchMedia('(max-width:720px)').matches; };
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function src(id){ return document.querySelector('#src [data-win="'+id+'"]'); }
+  function store(get, val){ try{ if(get) return sessionStorage.getItem('ariasos-booted'); sessionStorage.setItem('ariasos-booted','1'); }catch(e){ return null; } }
+
+  /* ---------- window manager ---------- */
+  function focusWin(id){
+    var w = wins[id]; if(!w) return;
+    w.el.dataset.min = '0';
+    w.el.style.zIndex = ++z;
+    Object.keys(wins).forEach(function(k){ wins[k].el.classList.toggle('focused', k===id); wins[k].task.classList.toggle('active', k===id); });
+    try{ history.replaceState(null,'','#'+id); }catch(e){}
+  }
+  function topWin(){
+    var best=null, bz=-1;
+    Object.keys(wins).forEach(function(k){ var w=wins[k]; if(w.el.dataset.min!=='1' && +w.el.style.zIndex>bz){ bz=+w.el.style.zIndex; best=k; } });
+    return best;
+  }
+  function closeWin(id){
+    var w = wins[id]; if(!w) return;
+    w.el.remove(); w.task.remove(); delete wins[id];
+    var t = topWin();
+    if(t) focusWin(t); else { try{ history.replaceState(null,'',location.pathname); }catch(e){} }
+  }
+  function minWin(id){
+    var w = wins[id]; if(!w) return;
+    w.el.dataset.min='1'; w.el.classList.remove('focused'); w.task.classList.remove('active');
+    var t = topWin(); if(t) focusWin(t);
+  }
+  function openWin(id){
+    if(wins[id]){ focusWin(id); return; }
+    var isTerm = id==='terminal';
+    var s = isTerm ? null : src(id);
+    if(!isTerm && !s) return;
+    var title = isTerm ? 'ernesto@ariasos: ~' : s.dataset.title;
+    var W = isTerm ? 640 : +s.dataset.w || 640, H = isTerm ? 420 : +s.dataset.h || 520;
+    var el = document.createElement('div');
+    el.className = 'win' + (isTerm ? ' term' : '');
+    el.setAttribute('role','dialog'); el.setAttribute('aria-label', title);
+    el.innerHTML = '<div class="titlebar"><span class="t"></span>'+
+      '<button class="wbtn" type="button" data-act="min" aria-label="Minimizar">–</button>'+
+      '<button class="wbtn max" type="button" data-act="max" aria-label="Maximizar">□</button>'+
+      '<button class="wbtn close" type="button" data-act="close" aria-label="Cerrar">×</button></div>'+
+      '<div class="wbody"></div><div class="resize" aria-hidden="true"></div>';
+    $('.t', el).textContent = title;
+    var body = $('.wbody', el);
+    if(isTerm) buildTerminal(body); else body.innerHTML = s.innerHTML;
+    var vw = window.innerWidth, vh = window.innerHeight, top0 = 52;
+    W = Math.min(W, vw - 140); H = Math.min(H, vh - top0 - 30);
+    var x = Math.min(130 + cascade*30, Math.max(120, vw - W - 20));
+    var y = Math.min(top0 + 10 + cascade*26, Math.max(top0, vh - H - 20));
+    cascade = (cascade+1) % 6;
+    el.style.left = x+'px'; el.style.top = y+'px'; el.style.width = W+'px'; el.style.height = H+'px';
+    winsEl.appendChild(el);
+
+    var task = document.createElement('button');
+    task.type='button'; task.className='task'; task.textContent = title.split(' — ')[0];
+    task.addEventListener('click', function(){
+      var w = wins[id];
+      if(w.el.dataset.min==='1' || !w.el.classList.contains('focused')) focusWin(id); else minWin(id);
+    });
+    tasksEl.appendChild(task);
+    wins[id] = {el:el, task:task};
+
+    el.addEventListener('pointerdown', function(){ if(!el.classList.contains('focused')) focusWin(id); });
+    $('.titlebar', el).addEventListener('click', function(e){
+      var act = e.target.closest('[data-act]'); if(!act) return;
+      if(act.dataset.act==='close') closeWin(id);
+      else if(act.dataset.act==='min') minWin(id);
+      else el.classList.toggle('max');
+    });
+    $('.titlebar', el).addEventListener('dblclick', function(e){ if(!e.target.closest('[data-act]') && !mobile()) el.classList.toggle('max'); });
+    drag($('.titlebar', el), el, false);
+    drag($('.resize', el), el, true);
+    focusWin(id);
+    body.scrollTop = 0;
+    if(isTerm) setTimeout(function(){ var i=$('input', el); if(i && !mobile()) i.focus(); }, 30);
+    else setTimeout(function(){ $('.wbtn.close', el).focus({preventScroll:true}); }, 30);
+  }
+  function drag(handle, el, resize){
+    handle.addEventListener('pointerdown', function(e){
+      if(mobile() || el.classList.contains('max') || e.target.closest('[data-act]') || e.button!==0) return;
+      e.preventDefault();
+      var sx=e.clientX, sy=e.clientY, ox=el.offsetLeft, oy=el.offsetTop, ow=el.offsetWidth, oh=el.offsetHeight;
+      handle.setPointerCapture(e.pointerId);
+      function mv(ev){
+        var dx=ev.clientX-sx, dy=ev.clientY-sy;
+        if(resize){ el.style.width=Math.max(280,ow+dx)+'px'; el.style.height=Math.max(180,oh+dy)+'px'; }
+        else {
+          el.style.left=Math.min(window.innerWidth-80, Math.max(-ow+120, ox+dx))+'px';
+          el.style.top=Math.min(window.innerHeight-40, Math.max(40, oy+dy))+'px';
+        }
+      }
+      function up(){ handle.removeEventListener('pointermove',mv); handle.removeEventListener('pointerup',up); handle.removeEventListener('pointercancel',up); }
+      handle.addEventListener('pointermove',mv); handle.addEventListener('pointerup',up); handle.addEventListener('pointercancel',up);
+    });
+  }
+
+  document.addEventListener('click', function(e){
+    var o = e.target.closest('[data-open]');
+    if(o){ e.preventDefault(); openWin(o.dataset.open); return; }
+    var c = e.target.closest('[data-copy]');
+    if(c){
+      var text = c.dataset.copy;
+      var done = function(){ c.textContent='Copiado'; setTimeout(function(){ c.textContent='Copiar'; },1600); };
+      try{ navigator.clipboard.writeText(text).then(done, function(){ c.textContent=text; }); }catch(err){ c.textContent=text; }
+    }
+  });
+  document.addEventListener('keydown', function(e){
+    if(e.key==='Escape' && $('#boot').hidden){ var t=topWin(); if(t) closeWin(t); }
+  });
+
+  /* ---------- clock ---------- */
+  function tick(){
+    var d=new Date();
+    var date=d.toLocaleDateString('es-DO',{weekday:'short',day:'numeric',month:'short'});
+    var time=d.toLocaleTimeString('es-DO',{hour:'2-digit',minute:'2-digit'});
+    $('#clock').innerHTML='<span class="date">'+date+' · </span>'+time;
+  }
+  tick(); setInterval(tick, 15000);
+
+  /* ---------- terminal ---------- */
+  var POSTS = {phantom:'phantom-nodes.md', iso8583:'ingesta-iso8583.md', ocr:'umbral-silencioso.md', motor:'motores-de-inferencia.md', cierre:'postmortem-animus.md'};
+  var APPS = ['about','notas','proyectos','paquetes','changelog','contacto','terminal'];
+  function esc(s){ return s.replace(/[&<>]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]; }); }
+  var NEOFETCH =
+'<span class="p">      /\\       </span>  <span class="p">ernesto</span>@<span class="p">ariasos</span>\n'+
+'<span class="p">     /  \\      </span>  ---------------\n'+
+'<span class="p">    / /\\ \\     </span>  <span class="p">OS:</span> ariasOS 15.0 LTS x86_64\n'+
+'<span class="p">   / ____ \\    </span>  <span class="p">Host:</span> Santo Domingo, RD\n'+
+'<span class="p">  /_/    \\_\\   </span>  <span class="p">Uptime:</span> 15+ años infra · hardware desde 2000\n'+
+'                  <span class="p">Kernel:</span> Linux / RHEL\n'+
+'                  <span class="p">Shell:</span> bash, powershell\n'+
+'                  <span class="p">Langs:</span> Rust, Python\n'+
+'                  <span class="p">Stack:</span> Ansible, Kubernetes, VMware, AWS\n'+
+'                  <span class="p">Middleware:</span> DataPower, NetScaler, brokers, Splunk\n'+
+'                  <span class="p">Domain:</span> banca y pagos ISO 8583\n';
+  function run(cmd){
+    var parts = cmd.trim().split(/\s+/), c = (parts[0]||'').toLowerCase(), a = (parts[1]||'').toLowerCase();
+    if(!c) return '';
+    switch(c){
+      case 'help': return 'Comandos disponibles:\n'+
+        '  <span class="p">whoami</span>          quién soy\n'+
+        '  <span class="p">neofetch</span>        resumen del sistema\n'+
+        '  <span class="p">ls</span> [notas]      listar secciones o notas\n'+
+        '  <span class="p">cat</span> &lt;nota&gt;      abrir una nota (ej. cat phantom-nodes.md)\n'+
+        '  <span class="p">open</span> &lt;app&gt;      abrir una ventana ('+APPS.join(', ')+')\n'+
+        '  <span class="p">systemctl status animus</span>\n'+
+        '  <span class="p">contacto</span>        cómo escribirme\n'+
+        '  <span class="p">clear</span>           limpiar pantalla';
+      case 'whoami': return 'Ernesto Arias Díaz. Director de TI. Infraestructura Linux, SRE y Rust.\n15+ años en sistemas críticos de banca y pagos. Santo Domingo, RD.';
+      case 'neofetch': return NEOFETCH;
+      case 'uname': return 'ariasOS 15.0-lts x86_64 GNU/Linux (Santo Domingo)';
+      case 'pwd': return '/home/ernesto';
+      case 'date': return new Date().toString();
+      case 'ls':
+        if(a==='notas' || a==='notas/' || a==='~/notas') return Object.keys(POSTS).map(function(k){ return POSTS[k]; }).join('\n');
+        return '<span class="p">notas/</span>  <span class="p">proyectos/</span>  paquetes.list  CHANGELOG.md  LEEME.txt  contacto';
+      case 'cat': case 'less': case 'vim': case 'nano':
+        var key = Object.keys(POSTS).filter(function(k){ return POSTS[k]===a.replace(/^notas\//,'') || k===a.replace(/\.md$/,''); })[0];
+        if(key){ openWin(key); return '<span class="d">abriendo '+POSTS[key]+'…</span>'; }
+        if(a==='leeme.txt'){ openWin('about'); return '<span class="d">abriendo LEEME.txt…</span>'; }
+        if(a==='changelog.md'){ openWin('changelog'); return '<span class="d">abriendo CHANGELOG.md…</span>'; }
+        return c+': '+esc(a||'')+': No existe el archivo. Prueba <span class="p">ls notas</span>.';
+      case 'open': case 'xdg-open':
+        var m = {leeme:'about','readme':'about'}[a] || a;
+        if(APPS.indexOf(m)>-1 || POSTS[m]){ openWin(m); return '<span class="d">abriendo '+esc(a)+'…</span>'; }
+        return 'open: '+esc(a)+': aplicación desconocida. Opciones: '+APPS.join(', ');
+      case 'cd': return a ? 'cd: aquí todo está en el escritorio. Prueba <span class="p">open '+esc(a.replace(/\/$/,''))+'</span>.' : '';
+      case 'systemctl':
+        if(/animus/.test(cmd)) return '<span class="bad">×</span> animus-autonomous.service - Sistema autónomo de conocimiento\n'+
+          '   Loaded: loaded (/etc/systemd/system/animus.service; <span class="d">disabled</span>)\n'+
+          '   Active: <span class="bad">inactive (archived)</span> since oct 2026\n'+
+          '   Docs:   cat postmortem-animus.md\n\n'+
+          '<span class="ok">●</span> phantom-audit.service - Auditoría de duplicados\n'+
+          '   Active: <span class="ok">active (exited)</span> · 1,892 → 911 nodos únicos';
+        return '<span class="ok">●</span> ernesto.service - Infraestructura crítica\n   Active: <span class="ok">active (running)</span>';
+      case 'sudo': return 'ernesto no está en el archivo sudoers. Este incidente será reportado.';
+      case 'rm': return 'rm: operación no permitida. Aquí las cosas se archivan con un postmortem.';
+      case 'contacto': case 'mail': return 'Correo:   ernesto.arias.d@gmail.com\nLinkedIn: <a href="https://www.linkedin.com/in/shellknower" target="_blank" rel="noopener">in/shellknower</a>\nGitHub:   <a href="https://github.com/ernestoariasdiaz" target="_blank" rel="noopener">ernestoariasdiaz</a>';
+      case 'exit': setTimeout(function(){ closeWin('terminal'); }, 120); return 'logout';
+      case 'clear': return null;
+      default: return esc(c)+': orden no encontrada. Escribe <span class="p">help</span>.';
+    }
+  }
+  function buildTerminal(body){
+    body.innerHTML = '<pre class="term-out"></pre><form class="term-line" autocomplete="off"><span class="p">ernesto@ariasos:~$</span><input type="text" id="term-input" aria-label="Comando" spellcheck="false" autocapitalize="off"></form>';
+    var out = $('.term-out', body), form = $('form', body), input = $('input', body), hist = [], hi = 0;
+    out.innerHTML = 'ariasOS 15.0 LTS · tty1\nEscribe <span class="p">help</span> para ver los comandos, o <span class="p">neofetch</span> para empezar.\n\n';
+    form.addEventListener('submit', function(e){
+      e.preventDefault();
+      var cmd = input.value; input.value='';
+      if(cmd.trim()){ hist.push(cmd); hi = hist.length; }
+      var r = run(cmd);
+      if(r===null){ out.innerHTML=''; }
+      else out.innerHTML += '<span class="p">ernesto@ariasos:~$</span> '+esc(cmd)+'\n'+(r ? r+'\n' : '');
+      body.scrollTop = body.scrollHeight;
+    });
+    input.addEventListener('keydown', function(e){
+      if(e.key==='ArrowUp' && hi>0){ hi--; input.value=hist[hi]; e.preventDefault(); }
+      else if(e.key==='ArrowDown'){ hi=Math.min(hist.length,hi+1); input.value=hist[hi]||''; e.preventDefault(); }
+    });
+    body.addEventListener('click', function(e){ if(!e.target.closest('a') && !window.getSelection().toString()) input.focus(); });
+  }
+
+  /* ---------- boot ---------- */
+  var BOOT = [
+    [0,  '<span class="dim">[    0.000000]</span> Linux version 6.12.0-ariasos (ernesto@santo-domingo) #2000 SMP'],
+    [60, '<span class="dim">[    0.000000]</span> Command line: BOOT_IMAGE=/vmlinuz-ariasos root=/dev/experiencia ro quiet'],
+    [60, '<span class="dim">[    0.004211]</span> DMI: Hardware ensamblado a mano, BIOS 2000'],
+    [60, '<span class="dim">[    0.118034]</span> CPU: 15+ años de infraestructura crítica detectados'],
+    [60, '<span class="dim">[    0.402117]</span> Memory: 1,892 nodos reportados, <span class="hl">911 verificados</span>'],
+    [120,'<span class="dim">[    1.207551]</span> systemd[1]: Detected architecture x86-64.'],
+    [80, '[  <span class="ok">OK</span>  ] Reached target <b>Hardware</b> — clones, Windows XP y servidores desde 2000.'],
+    [90, '[  <span class="ok">OK</span>  ] Mounted <b>/srv/linux</b> — RHEL en producción, 15+ años.'],
+    [90, '[  <span class="ok">OK</span>  ] Mounted <b>/srv/pagos</b> — sistemas ISO 8583.'],
+    [90, '[  <span class="ok">OK</span>  ] Started <b>it-director.service</b> — dirección de TI.'],
+    [90, '[  <span class="ok">OK</span>  ] Started <b>ansible.service</b> — automatización de infraestructura.'],
+    [90, '[  <span class="ok">OK</span>  ] Started <b>middleware.target</b> — DataPower, NetScaler, brokers, Splunk.'],
+    [90, '[  <span class="ok">OK</span>  ] Started <b>kubernetes.service</b> — CKAD en curso.'],
+    [90, '[  <span class="ok">OK</span>  ] Started <b>rust-toolchain.service</b> — Tokio, sqlx.'],
+    [90, '[  <span class="ok">OK</span>  ] Started <b>phantom-audit.service</b> — auditoría de grafos.'],
+    [140,'[<span class="bad">FAILED</span>] Failed to start <b>animus-autonomous.service</b>.'],
+    [40, '<span class="dim">         See "cat postmortem-animus.md" for details.</span>'],
+    [110,'[  <span class="ok">OK</span>  ] Reached target <b>Portafolio</b>.'],
+    [260,''],
+    [0,  'ariasOS 15.0 LTS ernestoarias.dev tty1'],
+    [0,  ''],
+    [120,'ernestoarias login: <span class="hl">invitado</span>'],
+    [300,'Last login: hoy desde la web. Iniciando escritorio…']
+  ];
+  var timers = [], booting = false;
+  function endBoot(){
+    if(!booting) return; booting = false;
+    timers.forEach(clearTimeout);
+    store(false);
+    var b = $('#boot');
+    b.classList.add('fadeout');
+    setTimeout(function(){ b.hidden = true; b.classList.remove('fadeout'); }, reduced ? 0 : 500);
+    document.removeEventListener('keydown', endBoot, true);
+    openWin('about');
+  }
+  function boot(){
+    booting = true;
+    var b = $('#boot'), log = $('#bootlog');
+    b.hidden = false;
+    log.innerHTML = '<div class="grub"><h2>GNU GRUB  version 2.12</h2><ul>'+
+      '<li class="sel">*ariasOS 15.0 LTS (ernestoarias.dev)</li><li> ariasOS 15.0 LTS (modo recuperación)</li>'+
+      '<li> Opciones avanzadas para ariasOS</li><li> Memtest86+</li></ul>'+
+      '<p>La entrada seleccionada arrancará automáticamente en <span id="grubs">2</span>s.</p></div>';
+    var t = 0;
+    timers.push(setTimeout(function(){ var g=$('#grubs'); if(g) g.textContent='1'; }, 600));
+    t = 1200;
+    timers.push(setTimeout(function(){ log.innerHTML=''; }, t));
+    BOOT.forEach(function(l){
+      t += l[0];
+      timers.push(setTimeout(function(){ log.insertAdjacentHTML('beforeend', l[1]+'\n'); }, t));
+    });
+    timers.push(setTimeout(endBoot, t + 700));
+    b.addEventListener('click', endBoot);
+    document.addEventListener('keydown', endBoot, true);
+  }
+
+  /* ---------- start ---------- */
+  var h = (location.hash||'').slice(1);
+  var target = (APPS.indexOf(h)>-1 || POSTS[h]) ? h : null;
+  if(target){ openWin(target); }
+  else if(reduced || store(true)){ openWin('about'); }
+  else boot();
+})();
+</script>
+</body>
+</html>
