@@ -177,6 +177,21 @@ th{font-family:var(--f-mono);font-size:11.5px;text-transform:uppercase;letter-sp
 .term-line input{flex:1;min-width:0;background:none;border:0;outline:0;color:var(--term-fg);font:inherit;caret-color:var(--term-acc)}
 
 #src{display:none}
+.guide{font-size:14px;color:var(--muted);background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:10px 12px;margin:16px 0 0}
+.linkbtn{background:none;border:0;padding:0;color:var(--accent);text-decoration:underline;cursor:pointer;font:inherit}
+.simplebtn{background:var(--wall-acc);color:#1a0c04;border:0;border-radius:4px;padding:4px 10px;font-family:var(--f-mono);font-size:12.5px;font-weight:500;cursor:pointer;white-space:nowrap}
+#boot .skip{background:#21262d;border:1px solid #484f58;color:#e6edf3;border-radius:4px;padding:8px 14px;font:inherit;font-size:13px;cursor:pointer}
+body.simple{overflow:auto;background:var(--bg)}
+body.simple #desktop,body.simple #boot{display:none}
+body.simple #src{display:block;max-width:820px;margin:0 auto;padding-inline:20px;padding-block:0 64px;color:var(--ink)}
+#src > section{padding-block:28px;border-bottom:1px solid var(--line)}
+.simple-top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;padding-block:12px;margin-inline:-20px;padding-inline:20px}
+.simple-top nav{display:flex;flex-wrap:wrap;gap:4px 14px;font-family:var(--f-mono);font-size:13px}
+.simple-top nav a{color:var(--muted);text-decoration:none}
+.simple-top nav a:hover{color:var(--accent)}
+.simple-h{font-size:28px;margin-bottom:14px}
+.simple-top .btn{padding:6px 12px;font-size:12.5px}
+.wbody > .simple-h,body.simple .guide,body.simple .pathbar,body.simple .cmd{display:none}
 
 /* phones: icon grid fills the screen, windows are full-screen */
 @media (max-width:720px){
@@ -195,7 +210,7 @@ th{font-family:var(--f-mono);font-size:11.5px;text-transform:uppercase;letter-sp
 </head>
 <body>
 
-<div id="boot" hidden aria-hidden="true"><div class="bootlog" id="bootlog"></div><div class="skip">pulsa cualquier tecla para saltar</div></div>
+<div id="boot" hidden aria-hidden="true"><div class="bootlog" id="bootlog"></div><button class="skip" type="button">Saltar intro →</button></div>
 
 <div id="desktop">
   <header class="panel">
@@ -204,37 +219,38 @@ th{font-family:var(--f-mono);font-size:11.5px;text-transform:uppercase;letter-sp
       ariasOS
     </button>
     <nav class="tasks" id="tasks" aria-label="Ventanas abiertas"></nav>
+    <button class="simplebtn" type="button" data-simple="on">Vista simple</button>
     <span class="clock" id="clock"></span>
   </header>
 
   <nav class="icons" aria-label="Escritorio">
     <button class="icon" type="button" data-open="about">
       <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="8" y="4" width="32" height="40" rx="3" fill="#e6eaf0"/><path d="M14 14h20M14 20h20M14 26h14M14 32h18" stroke="#8b96a5" stroke-width="2.4" stroke-linecap="round"/><circle cx="35" cy="36" r="9" fill="#f0783a"/><path d="M35 32v1M35 35.5v5" stroke="#1a0c04" stroke-width="2.4" stroke-linecap="round"/></svg>
-      <span>LEEME.txt</span>
+      <span>Sobre mí</span>
     </button>
     <button class="icon" type="button" data-open="notas">
       <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M4 12a3 3 0 0 1 3-3h12l4 5h18a3 3 0 0 1 3 3v22a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3z" fill="#c2541a"/><path d="M4 18h40v20a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3z" fill="#f0783a"/><path d="M15 27h18M15 33h12" stroke="#1a0c04" stroke-width="2.4" stroke-linecap="round" opacity=".55"/></svg>
-      <span>notas</span>
+      <span>Artículos</span>
     </button>
     <button class="icon" type="button" data-open="proyectos">
       <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M4 12a3 3 0 0 1 3-3h12l4 5h18a3 3 0 0 1 3 3v22a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3z" fill="#3b6ea8"/><path d="M4 18h40v20a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3z" fill="#5b8fd0"/><path d="M19 25l-5 5 5 5M29 25l5 5-5 5" stroke="#0b1a2c" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg>
-      <span>proyectos</span>
+      <span>Proyectos</span>
     </button>
     <button class="icon" type="button" data-open="paquetes">
       <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 4l18 9v22l-18 9-18-9V13z" fill="#c9a24a"/><path d="M6 13l18 9 18-9M24 22v22" stroke="#5a4510" stroke-width="2.2" fill="none" stroke-linejoin="round"/><path d="M15 8.5l18 9" stroke="#5a4510" stroke-width="2.2" opacity=".6"/></svg>
-      <span>paquetes</span>
+      <span>Habilidades</span>
     </button>
     <button class="icon" type="button" data-open="changelog">
       <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="6" y="6" width="36" height="36" rx="4" fill="#2f7d4f"/><circle cx="16" cy="15" r="3.5" fill="#e6eaf0"/><circle cx="16" cy="33" r="3.5" fill="#e6eaf0"/><circle cx="32" cy="24" r="3.5" fill="#e6eaf0"/><path d="M16 18.5v11M16 22c0 2 4 2 12 2" stroke="#e6eaf0" stroke-width="2.4" fill="none"/></svg>
-      <span>changelog</span>
+      <span>Experiencia</span>
     </button>
     <button class="icon" type="button" data-open="terminal">
       <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="4" y="8" width="40" height="32" rx="4" fill="#0d1117" stroke="#3a4552" stroke-width="2"/><path d="M12 19l6 5-6 5" stroke="#f0783a" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M22 30h12" stroke="#e6eaf0" stroke-width="3" stroke-linecap="round"/></svg>
-      <span>terminal</span>
+      <span>Terminal</span>
     </button>
     <button class="icon" type="button" data-open="contacto">
       <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="4" y="10" width="40" height="28" rx="4" fill="#e6eaf0"/><path d="M6 13l18 14 18-14" stroke="#8b96a5" stroke-width="2.6" fill="none" stroke-linejoin="round"/><circle cx="38" cy="12" r="6" fill="#f0783a"/></svg>
-      <span>contacto</span>
+      <span>Contacto</span>
     </button>
   </nav>
 
@@ -245,16 +261,17 @@ th{font-family:var(--f-mono);font-size:11.5px;text-transform:uppercase;letter-sp
 <!-- Window contents. Kept in the page so search engines and no-JS readers get everything. -->
 <div id="src">
 
-<section data-win="about" data-title="LEEME.txt — bienvenida" data-w="640" data-h="560">
+<section data-win="about" data-label="Sobre mí" data-title="Sobre mí" data-w="640" data-h="560">
   <span class="eyebrow">Santo Domingo, República Dominicana</span>
   <h1 class="hero-h">Ernesto Arias Díaz<br><span>Infraestructura Linux, SRE y Rust</span></h1>
   <p class="lede">Director de TI. Más de 15 años manteniendo encendidos sistemas críticos del sector financiero y de pagos, y trabajando con hardware desde el año 2000. Investigador independiente en sistemas de conocimiento con LLMs locales. Escribo sobre lo que mido, incluido lo que sale mal.</p>
   <div class="row">
-    <button class="btn primary" type="button" data-open="notas">Leer las notas</button>
-    <button class="btn" type="button" data-open="proyectos">Ver proyectos</button>
-    <button class="btn" type="button" data-open="changelog">Trayectoria</button>
+    <button class="btn primary" type="button" data-open="changelog">Ver experiencia</button>
+    <button class="btn" type="button" data-open="proyectos">Proyectos</button>
+    <button class="btn" type="button" data-open="paquetes">Habilidades</button>
     <button class="btn" type="button" data-open="contacto">Contacto</button>
   </div>
+  <p class="guide">Este sitio tiene forma de escritorio de computadora: cada ícono abre una sección. Si prefieres leer todo en una página normal, usa la <button class="linkbtn" type="button" data-simple="on">vista simple</button>.</p>
   <dl class="spec">
     <div><dt>Cargo</dt><dd>Director de TI</dd></div>
     <div><dt>Experiencia</dt><dd>15+ años</dd></div>
@@ -262,10 +279,10 @@ th{font-family:var(--f-mono);font-size:11.5px;text-transform:uppercase;letter-sp
     <div><dt>Lenguaje</dt><dd>Rust</dd></div>
     <div><dt>Investigación</dt><dd>1,351 vistas</dd></div>
   </dl>
-  <p class="cmd" style="margin:18px 0 0">Consejo: abre la <a href="#terminal" data-open="terminal">terminal</a> y escribe <code>help</code>.</p>
+  <p class="cmd" style="margin:18px 0 0">Para curiosos técnicos: abre la <a href="#terminal" data-open="terminal">terminal</a> y escribe <code>help</code>.</p>
 </section>
 
-<section data-win="notas" data-title="~/notas — 5 archivos" data-w="660" data-h="560">
+<section data-win="notas" data-label="Artículos" data-title="Artículos" data-w="660" data-h="560">
   <p class="pathbar">/home/ernesto/notas</p>
   <ul class="files">
     <li><button class="file" type="button" data-open="phantom">
@@ -291,7 +308,7 @@ th{font-family:var(--f-mono);font-size:11.5px;text-transform:uppercase;letter-sp
   </ul>
 </section>
 
-<section data-win="proyectos" data-title="~/proyectos" data-w="760" data-h="560">
+<section data-win="proyectos" data-label="Proyectos" data-title="Proyectos" data-w="760" data-h="560">
   <p class="pathbar">/home/ernesto/proyectos</p>
   <div class="projects">
     <div class="proj">
@@ -317,7 +334,7 @@ th{font-family:var(--f-mono);font-size:11.5px;text-transform:uppercase;letter-sp
   </div>
 </section>
 
-<section data-win="paquetes" data-title="paquetes instalados" data-w="720" data-h="520">
+<section data-win="paquetes" data-label="Habilidades" data-title="Habilidades" data-w="720" data-h="520">
   <p class="cmd">$ pacman -Q --explicit</p>
   <div class="pkgs">
     <div class="pkg"><h3>core/sistemas</h3><ul>
@@ -349,7 +366,7 @@ th{font-family:var(--f-mono);font-size:11.5px;text-transform:uppercase;letter-sp
   </div>
 </section>
 
-<section data-win="changelog" data-title="CHANGELOG.md" data-w="620" data-h="580">
+<section data-win="changelog" data-label="Experiencia" data-title="Experiencia" data-w="620" data-h="580">
   <p class="cmd">$ git log --reverse=false trayectoria</p>
   <div class="log">
     <div class="entry">
@@ -413,7 +430,7 @@ th{font-family:var(--f-mono);font-size:11.5px;text-transform:uppercase;letter-sp
   </div>
 </section>
 
-<section data-win="contacto" data-title="contacto — mirrors" data-w="560" data-h="400">
+<section data-win="contacto" data-label="Contacto" data-title="Contacto" data-w="560" data-h="400">
   <p class="cmd">$ cat /etc/pacman.d/mirrorlist</p>
   <div class="mirrors">
     <div class="mirror"><span>Correo</span><a class="mail" href="mailto:ernesto.arias.d@gmail.com">ernesto.arias.d@gmail.com</a><button class="btn copy" type="button" data-copy="ernesto.arias.d@gmail.com">Copiar</button></div>
@@ -424,7 +441,7 @@ th{font-family:var(--f-mono);font-size:11.5px;text-transform:uppercase;letter-sp
   </div>
 </section>
 
-<section data-win="phantom" data-title="phantom-nodes.md — notas" data-w="720" data-h="620">
+<section data-win="phantom" data-title="Artículo — Phantom Nodes" data-w="720" data-h="620">
 <article>
   <span class="eyebrow">Auditoría · junio 2026</span>
   <h1>Phantom Nodes: el 52% de mi grafo no existía</h1>
@@ -452,7 +469,7 @@ th{font-family:var(--f-mono);font-size:11.5px;text-transform:uppercase;letter-sp
 </article>
 </section>
 
-<section data-win="iso8583" data-title="ingesta-iso8583.md — notas" data-w="740" data-h="620">
+<section data-win="iso8583" data-title="Artículo — Ingesta ISO 8583" data-w="740" data-h="620">
 <article>
   <span class="eyebrow">Rust · pagos · julio 2026</span>
   <h1>Ingesta ISO 8583 asíncrona en Rust con Tokio</h1>
@@ -492,7 +509,7 @@ th{font-family:var(--f-mono);font-size:11.5px;text-transform:uppercase;letter-sp
 </article>
 </section>
 
-<section data-win="ocr" data-title="umbral-silencioso.md — notas" data-w="700" data-h="600">
+<section data-win="ocr" data-title="Artículo — Umbral silencioso" data-w="700" data-h="600">
 <article>
   <span class="eyebrow">Datos · julio 2026</span>
   <h1>259 documentos que nunca entraron: un umbral silencioso</h1>
@@ -513,7 +530,7 @@ th{font-family:var(--f-mono);font-size:11.5px;text-transform:uppercase;letter-sp
 </article>
 </section>
 
-<section data-win="motor" data-title="motores-de-inferencia.md — notas" data-w="700" data-h="600">
+<section data-win="motor" data-title="Artículo — Motores de inferencia" data-w="700" data-h="600">
 <article>
   <span class="eyebrow">LLM · GPU · junio 2026</span>
   <h1>De 3.5 a 79 tokens/s en hardware de consumo</h1>
@@ -540,7 +557,7 @@ th{font-family:var(--f-mono);font-size:11.5px;text-transform:uppercase;letter-sp
 </article>
 </section>
 
-<section data-win="cierre" data-title="postmortem-animus.md — notas" data-w="700" data-h="600">
+<section data-win="cierre" data-title="Artículo — Postmortem ANIMUS" data-w="700" data-h="600">
 <article>
   <span class="eyebrow">Postmortem · octubre 2026</span>
   <h1>Postmortem: por qué archivo ANIMUS</h1>
@@ -679,8 +696,40 @@ th{font-family:var(--f-mono);font-size:11.5px;text-transform:uppercase;letter-sp
     });
   }
 
+  /* ---------- simple view ---------- */
+  var srcEl = $('#src');
+  (function(){
+    var top = document.createElement('div'); top.className='simple-top';
+    var links = Array.prototype.map.call(srcEl.querySelectorAll('section[data-label]'), function(sec){
+      var h = document.createElement('h2'); h.className='simple-h'; h.id='s-'+sec.dataset.win; h.textContent=sec.dataset.label;
+      sec.insertBefore(h, sec.firstChild);
+      return '<a href="#s-'+sec.dataset.win+'" data-jump="'+sec.dataset.win+'">'+sec.dataset.label+'</a>';
+    }).join('');
+    top.innerHTML='<strong style="font-family:var(--f-display)">Ernesto Arias Díaz</strong><nav aria-label="Secciones">'+links+'</nav><button class="btn" type="button" data-simple="off">Ver como escritorio</button>';
+    srcEl.insertBefore(top, srcEl.firstChild);
+  })();
+  function setSimple(on){
+    document.body.classList.toggle('simple', on);
+    try{ history.replaceState(null,'', on ? '#simple' : location.pathname); }catch(e){}
+    window.scrollTo(0,0);
+    if(!on && !Object.keys(wins).length) openWin('about');
+  }
+  function jump(id){
+    var sec = srcEl.querySelector('[data-win="'+id+'"]');
+    if(sec){ var y = sec.getBoundingClientRect().top + window.scrollY - ($('.simple-top').offsetHeight + 8); window.scrollTo(0, y); }
+  }
+
   document.addEventListener('click', function(e){
+    var sm = e.target.closest('[data-simple]');
+    if(sm){ e.preventDefault(); setSimple(sm.dataset.simple==='on'); return; }
+    var jp = e.target.closest('[data-jump]');
+    if(jp){ e.preventDefault(); jump(jp.dataset.jump); return; }
     var o = e.target.closest('[data-open]');
+    if(o && document.body.classList.contains('simple')){
+      e.preventDefault();
+      if(o.dataset.open==='terminal'){ setSimple(false); openWin('terminal'); } else jump(o.dataset.open);
+      return;
+    }
     if(o){ e.preventDefault(); openWin(o.dataset.open); return; }
     var c = e.target.closest('[data-copy]');
     if(c){
@@ -830,16 +879,15 @@ th{font-family:var(--f-mono);font-size:11.5px;text-transform:uppercase;letter-sp
     log.innerHTML = '<div class="grub"><h2>GNU GRUB  version 2.12</h2><ul>'+
       '<li class="sel">*ariasOS 15.0 LTS (ernestoarias.dev)</li><li> ariasOS 15.0 LTS (modo recuperación)</li>'+
       '<li> Opciones avanzadas para ariasOS</li><li> Memtest86+</li></ul>'+
-      '<p>La entrada seleccionada arrancará automáticamente en <span id="grubs">2</span>s.</p></div>';
+      '<p>La entrada seleccionada arrancará automáticamente en <span id="grubs">1</span>s.</p></div>';
     var t = 0;
-    timers.push(setTimeout(function(){ var g=$('#grubs'); if(g) g.textContent='1'; }, 600));
-    t = 1200;
+        t = 750;
     timers.push(setTimeout(function(){ log.innerHTML=''; }, t));
     BOOT.forEach(function(l){
-      t += l[0];
+      t += Math.round(l[0]*0.65);
       timers.push(setTimeout(function(){ log.insertAdjacentHTML('beforeend', l[1]+'\n'); }, t));
     });
-    timers.push(setTimeout(endBoot, t + 700));
+    timers.push(setTimeout(endBoot, t + 500));
     b.addEventListener('click', endBoot);
     document.addEventListener('keydown', endBoot, true);
   }
@@ -847,7 +895,8 @@ th{font-family:var(--f-mono);font-size:11.5px;text-transform:uppercase;letter-sp
   /* ---------- start ---------- */
   var h = (location.hash||'').slice(1);
   var target = (APPS.indexOf(h)>-1 || POSTS[h]) ? h : null;
-  if(target){ openWin(target); }
+  if(h==='simple'){ setSimple(true); }
+  else if(target){ openWin(target); }
   else if(reduced || store(true)){ openWin('about'); }
   else boot();
 })();
